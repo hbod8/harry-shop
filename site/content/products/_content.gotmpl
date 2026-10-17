@@ -1,0 +1,49 @@
+{{/*
+  One page per listed, active product in this storefront, from PocketBase's
+  public API. Unlisted products are never returned by the list rule, so they
+  never get a page; they render client-side at /item/#<id>.
+*/}}
+{{ $filter := printf "storefront.slug='%s'" site.Params.storefront }}
+{{ $url := printf "%s/api/collections/products/records?perPage=500&sort=created&expand=terms,variants_via_product&filter=%s"
+  site.Params.api (urlquery $filter) }}
+
+{{ with try (resources.GetRemote $url) }}
+  {{ with .Err }}
+    {{ errorf "fetching the catalog from %s: %s (is PocketBase running?)" site.Params.api . }}
+  {{ else with .Value }}
+    {{ range (. | transform.Unmarshal).items }}
+      {{ $variants := sort (.expand.variants_via_product | default slice) "position" }}
+
+      {{/* term keys ("tags/seattle-rain", "types/print") let term pages find their products */}}
+      {{ $terms := slice }}
+      {{ $keys := slice (printf "types/%s" .product_type) }}
+      {{ range sort (.expand.terms | default slice) "name" }}
+        {{ $terms = $terms | append (dict "taxonomy" .taxonomy "slug" .slug "name" .name) }}
+        {{ $keys = $keys | append (printf "%s/%s" .taxonomy .slug) }}
+      {{ end }}
+
+      {{ $prices := slice }}
+      {{ range $variants }}{{ $prices = $prices | append (int .price_cents) }}{{ end }}
+      {{ $prices = sort $prices }}
+
+      {{ $.AddPage (dict
+        "kind" "page"
+        "path" .slug
+        "title" .title
+        "dates" (dict "date" (time.AsTime .created))
+        "params" (dict
+          "id" .id
+          "collection_id" .collectionId
+          "description" .description
+          "images" .images
+          "product_type" .product_type
+          "variants" $variants
+          "terms" $terms
+          "term_keys" $keys
+          "min_price" (cond (gt (len $prices) 0) (index $prices 0) 0)
+          "max_price" (cond (gt (len $prices) 0) (index $prices (sub (len $prices) 1)) 0)
+        )
+      ) }}
+    {{ end }}
+  {{ end }}
+{{ end }}

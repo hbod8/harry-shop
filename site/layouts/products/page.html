@@ -1,0 +1,46 @@
+{{ define "head" }}<script src="{{ partial "asset.html" "js/stock.js" }}" defer></script>{{ end }}
+{{ define "main" }}
+<article class="product" data-product="{{ .Params.id }}">
+  <div class="gallery">
+    {{ $images := .Params.images | default slice }}
+    {{ with index $images 0 }}
+      <img src="{{ partial "image-url.html" (dict "page" $ "file" . "thumb" "1200x0") }}" alt="{{ $.Title }}">
+    {{ else }}
+      <div class="placeholder large" aria-hidden="true"><span>{{ .Title }}</span></div>
+    {{ end }}
+    {{ if gt (len $images) 1 }}
+      <div class="thumbs">
+        {{ range after 1 $images }}
+          <a href="{{ partial "image-url.html" (dict "page" $ "file" .) }}">
+            <img src="{{ partial "image-url.html" (dict "page" $ "file" . "thumb" "600x0") }}" alt="" loading="lazy">
+          </a>
+        {{ end }}
+      </div>
+    {{ end }}
+  </div>
+
+  <div class="details">
+    <p class="muted"><a href="/types/{{ .Params.product_type }}/">{{ title .Params.product_type }}</a></p>
+    <h1>{{ .Title }}</h1>
+    <p class="price large">{{ partial "price-range.html" . }}</p>
+
+    {{ with .Params.variants }}
+      <table class="variants">
+        <tbody>
+          {{ range . }}
+            <tr>
+              <th scope="row">{{ .name }}</th>
+              <td>{{ partial "money.html" .price_cents }}</td>
+              <td><span class="stock" data-stock="{{ .id }}">Checking stock…</span></td>
+            </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    {{ end }}
+    <p class="muted"><small>Ordering opens soon.</small></p>
+
+    <div class="prose">{{ partial "plaintext.html" .Params.description }}</div>
+    {{ partial "term-chips.html" . }}
+  </div>
+</article>
+{{ end }}

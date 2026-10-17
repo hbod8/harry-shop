@@ -34,7 +34,6 @@ func Seed(app core.App) error {
 
 		rain := s.add("terms", map[string]any{"taxonomy": "tags", "slug": "seattle-rain", "name": "Seattle Rain"})
 		bw := s.add("terms", map[string]any{"taxonomy": "tags", "slug": "black-and-white", "name": "Black and White"})
-		noir := s.add("terms", map[string]any{"taxonomy": "themes", "slug": "film-noir", "name": "Film Noir"})
 		holiday := s.add("terms", map[string]any{"taxonomy": "collections", "slug": "holiday-2026", "name": "Holiday 2026", "description": "Gift picks for the 2026 holidays."})
 
 		product := func(productType, title, slug string, terms, channels []string, listed, active bool) string {
@@ -43,7 +42,7 @@ func Seed(app core.App) error {
 				"product_type": productType,
 				"title":        title,
 				"slug":         slug,
-				"description":  "<p>" + title + ".</p>",
+				"description":  title + ".\n\nPrinted and packed by hand in Seattle.",
 				"terms":        terms,
 				"channels":     channels,
 				"listed":       listed,
@@ -61,7 +60,7 @@ func Seed(app core.App) error {
 		pike8x10 := variant(pike, "PRINT-PIKE-8X10", "8×10", 3500, 5, 1)
 		variant(pike, "PRINT-PIKE-11X14", "11×14", 6000, 2, 2)
 
-		rainier := product("print", "Rainier from Kerry Park", "rainier-from-kerry-park", []string{rain, bw, noir}, []string{card}, true, true)
+		rainier := product("print", "Rainier from Kerry Park", "rainier-from-kerry-park", []string{rain, bw}, []string{card}, true, true)
 		rainier8x10 := variant(rainier, "PRINT-RAINIER-8X10", "8×10", 3500, 3, 1)
 
 		tee := product("apparel", "Harry Logo Tee", "harry-logo-tee", []string{holiday}, []string{card, manual}, true, true)

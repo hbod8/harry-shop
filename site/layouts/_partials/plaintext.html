@@ -1,0 +1,7 @@
+{{- /* plain text to paragraphs: blank lines split paragraphs, single newlines
+       become line breaks. Text is escaped first, so it can never be markup. */ -}}
+{{- range split (replace (. | default "") "\r\n" "\n") "\n\n" -}}
+  {{- with trim . " \n" -}}
+    <p>{{ replace (htmlEscape .) "\n" "<br>" | safeHTML }}</p>
+  {{- end -}}
+{{- end -}}

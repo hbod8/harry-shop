@@ -93,7 +93,7 @@ Empty API rule = public; null (locked) = superusers and Go code only. Superusers
 
 ```
 storefronts ─< products >── product_type (select)
-                  │  >─< terms (Hugo taxonomies: tags, themes, collections)
+                  │  >─< terms (taxonomies: tags, collections)
                   │  >─< channels (ways to pay)
                   └─< variants (stock + price, shared by every channel)
 users ─< orders >── storefront, channel        users ─< user_notes
@@ -105,8 +105,8 @@ users ─< orders >── storefront, channel        users ─< user_notes
 |---|---|---|---|
 | `storefronts` | `slug` (unique), `name`, `domain` | public | admin |
 | `channels` | `slug` (unique), `name`, `provider` (stripe, manual), `active` | public | admin |
-| `terms` | `taxonomy` (text, slug pattern, e.g. tags, themes, collections), `slug`, `name`, `description`; unique (taxonomy, slug) | public | admin |
-| `products` | `storefront` (single), `product_type` (select: print, apparel, chemistry), `title`, `slug`, `description` (editor), `images` (files, thumbs 600x0/1200x0), `tax_code`, `terms` (multi), `channels` (multi, required), `listed`, `active`; unique (storefront, slug) | list `active && listed`, view `active` | admin |
+| `terms` | `taxonomy` (select: tags, collections), `slug`, `name`, `description`; unique (taxonomy, slug) | public | admin |
+| `products` | `storefront` (single), `product_type` (select: print, apparel, chemistry), `title`, `slug`, `description` (plain text; blank lines split paragraphs), `images` (files, thumbs 600x0/1200x0), `tax_code`, `terms` (multi), `channels` (multi, required), `listed`, `active`; unique (storefront, slug) | list `active && listed`, view `active` | admin |
 | `variants` | `product` (no cascade), `sku` (unique), `name`, `price_cents`, `on_hand`, `reserved`, `position` | list `product.active && product.listed`, view `product.active` | admin and Go |
 | `users` (built in) | + `phone`, `discord`, `marketing_consent`, `consent_at`; OTP enabled | own record | sign-up via API; hook sets `consent_at` |
 | `user_notes` | `user` (cascade), `order` (optional), `source` (discord, in_person, email, other), `body` | locked | admin |
@@ -119,11 +119,15 @@ users ─< orders >── storefront, channel        users ─< user_notes
 | `stripe_events` | `event_id` (unique), `type` | locked | Go only |
 
 - **Taxonomies follow Hugo's model**: a taxonomy (`tags`) has terms (`seattle-rain`) assigned to
-  products. `terms.taxonomy` is free text (lowercase slug pattern), so a new taxonomy is just a
-  new name typed in `/_/`. Before each Hugo build, a Go command writes the distinct taxonomy names
-  into Hugo's `[taxonomies]` config, so term pages exist for every taxonomy in use.
-  `product_type` is also published to Hugo as the `types` taxonomy; it is not called `type`
-  because that front matter key picks layouts in Hugo.
+  products. There are three taxonomies: `tags` and `collections` (`terms.taxonomy`, a fixed
+  select; adding one is a migration) and `types` (`products.product_type`). The site doesn't use
+  Hugo's built-in taxonomies: a content adapter (`site/content/_content.gotmpl`) builds the taxonomy and term pages
+  from the `terms` API, and product pages carry `term_keys` (`tags/seattle-rain`) that term pages
+  match on. `product_type` is published as the `types` taxonomy; it is not called `type` because
+  that front matter key picks layouts in Hugo.
+- **Descriptions are plain text**, rendered as escaped paragraphs, so Hugo's default content
+  security policy (no raw HTML) stays untouched. Only the local-API fetch rule in
+  `[security.http]` is changed.
 - **Channels are chosen per order.** A product lists the channels it may be paid through. At
   checkout the cart's channel must be allowed by every product in it; if both card and manual
   fit, the buyer picks; if none fits, checkout refuses ("order these separately"). Stock is

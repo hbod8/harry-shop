@@ -1,0 +1,2 @@
+{{- /* products carrying a term key such as "tags/seattle-rain" */ -}}
+{{- return where (where site.RegularPages "Section" "products") "Params.term_keys" "intersect" (slice .) -}}

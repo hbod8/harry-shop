@@ -1,0 +1,3 @@
+{{- /* integer cents to "$35.00"; never floats */ -}}
+{{- $c := int . -}}
+{{- printf "$%d.%02d" (div $c 100) (mod $c 100) -}}

@@ -1,0 +1,7 @@
+{{ if . }}
+  <div class="grid-products">
+    {{ range . }}{{ partial "product-card.html" . }}{{ end }}
+  </div>
+{{ else }}
+  <p class="muted">Nothing here yet.</p>
+{{ end }}

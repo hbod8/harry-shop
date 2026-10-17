@@ -1,4 +1,45 @@
 baseURL = "/"
-title = "harry-shop"
+title = "Harry's Shop"
 publishDir = "../pb_public"
-disableKinds = ["taxonomy", "term", "RSS", "sitemap"]
+disableKinds = ["RSS", "sitemap", "taxonomy", "term"]
+# Taxonomy and term pages come from the content adapter in
+# content/_content.gotmpl, not Hugo's built-in taxonomies.
+
+[params]
+  # where the build reads the catalog; override with HUGO_PARAMS_API
+  api = "http://127.0.0.1:8090"
+  storefront = "harry"
+  tagline = "Photographs of the Pacific Northwest, printed by hand."
+
+# always fetch a fresh catalog; never serve it from Hugo's cache
+[caches.getresource]
+  maxAge = 0
+
+[menus]
+  [[menus.main]]
+    name = "Shop"
+    pageRef = "/products"
+    weight = 1
+  [[menus.main]]
+    name = "Prints"
+    url = "/types/print/"
+    weight = 2
+  [[menus.main]]
+    name = "Apparel"
+    url = "/types/apparel/"
+    weight = 3
+  [[menus.main]]
+    name = "Collections"
+    url = "/collections/"
+    weight = 4
+  [[menus.main]]
+    name = "About"
+    pageRef = "/about"
+    weight = 5
+
+# Hugo blocks local and IP-address URLs by default; the catalog comes from
+# the local PocketBase (or an https API when building elsewhere).
+[security.http]
+  methods = ['(?i)GET']
+  urls = ['^http://127\.0\.0\.1(:\d+)?/api/', '^https://']
+

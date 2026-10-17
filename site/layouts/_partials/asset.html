@@ -1,0 +1,2 @@
+{{- /* a fingerprinted URL for a file in assets/, so browsers never use a stale copy */ -}}
+{{- with resources.Get . -}}{{- (. | fingerprint).RelPermalink -}}{{- else -}}{{- errorf "missing asset %s" . -}}{{- end -}}

@@ -1,0 +1,4 @@
+{{- /* context: dict "page" <product page> "file" <filename> "thumb" "600x0" */ -}}
+{{- $p := .page.Params -}}
+{{- printf "/api/files/%s/%s/%s" $p.collection_id $p.id .file -}}
+{{- with .thumb }}?thumb={{ . }}{{ end -}}

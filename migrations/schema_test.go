@@ -329,10 +329,9 @@ func TestConstraints(t *testing.T) {
 
 	mustFail("duplicate sku", save("variants", map[string]any{"product": id.tee, "sku": "TEE-LOGO-M", "name": "M again"}))
 	mustFail("duplicate term in a taxonomy", save("terms", map[string]any{"taxonomy": "tags", "slug": "seattle-rain", "name": "x"}))
-	mustPass("same term slug in another taxonomy", save("terms", map[string]any{"taxonomy": "themes", "slug": "seattle-rain", "name": "x"}))
+	mustPass("same term slug in another taxonomy", save("terms", map[string]any{"taxonomy": "collections", "slug": "seattle-rain", "name": "x"}))
 	mustFail("bad slug", save("terms", map[string]any{"taxonomy": "tags", "slug": "Seattle Rain", "name": "x"}))
-	mustPass("new taxonomy", save("terms", map[string]any{"taxonomy": "series", "slug": "rain-city", "name": "x"}))
-	mustFail("badly formed taxonomy", save("terms", map[string]any{"taxonomy": "Tags ", "slug": "x", "name": "x"}))
+	mustFail("unknown taxonomy", save("terms", map[string]any{"taxonomy": "themes", "slug": "x", "name": "x"}))
 	mustFail("duplicate product slug in a storefront", save("products", map[string]any{
 		"storefront": harry.Id, "product_type": "print", "title": "x", "slug": "pike-place-at-dawn", "channels": []string{manual.Id},
 	}))

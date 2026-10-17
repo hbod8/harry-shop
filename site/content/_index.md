@@ -1,3 +1,3 @@
 ---
-title: harry-shop
+title: Harry's Shop
 ---

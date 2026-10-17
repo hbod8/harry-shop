@@ -1,0 +1,27 @@
+{{ define "main" }}
+{{ if .Params.term_key }}
+  {{/* a term, e.g. /tags/seattle-rain/ */}}
+  <p class="muted"><a href="{{ .Parent.RelPermalink }}">{{ .Parent.Title }}</a></p>
+  <h1>{{ .Title }}</h1>
+  {{ with .Params.description }}<div class="lead prose">{{ partial "plaintext.html" . }}</div>{{ end }}
+  {{ partial "product-grid.html" (partial "products-with-term.html" .Params.term_key).ByDate.Reverse }}
+
+{{ else if .Params.taxonomy }}
+  {{/* a taxonomy, e.g. /tags/ */}}
+  <h1>{{ .Title }}</h1>
+  {{ partial "term-tiles.html" . }}
+
+{{ else }}
+  {{/* the shop */}}
+  <h1>{{ .Title }}</h1>
+  {{ with site.GetPage "/types" }}
+    <p class="chips">
+      <a href="/products/" aria-current="page">All</a>
+      {{ range .Sections.ByTitle }}
+        {{ if partial "products-with-term.html" .Params.term_key }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}
+      {{ end }}
+    </p>
+  {{ end }}
+  {{ partial "product-grid.html" .Pages.ByDate.Reverse }}
+{{ end }}
+{{ end }}

@@ -3,12 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ .Title }}</title>
+  <title>{{ if .IsHome }}{{ site.Title }}{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
+  <meta name="description" content="{{ site.Params.tagline }}">
   <link rel="stylesheet" href="/vendor/pico.min.css">
+  <link rel="stylesheet" href="{{ partial "asset.html" "css/site.css" }}">
+  <script src="{{ partial "asset.html" "js/api.js" }}" defer></script>
+  {{ block "head" . }}{{ end }}
 </head>
 <body>
+  <header class="container site-header">
+    <nav>
+      <ul><li><a href="/" class="brand">{{ site.Title }}</a></li></ul>
+      <ul>
+        {{ range site.Menus.main }}
+          <li><a href="{{ .URL }}"{{ if $.IsMenuCurrent "main" . }} aria-current="page"{{ end }}>{{ .Name }}</a></li>
+        {{ end }}
+      </ul>
+    </nav>
+  </header>
   <main class="container">
     {{ block "main" . }}{{ end }}
   </main>
+  <footer class="container site-footer">
+    <small>
+      © {{ now.Year }} Harry Saliba ·
+      <a href="/shipping-returns/">Shipping and returns</a> ·
+      <a href="/about/">About</a>
+    </small>
+  </footer>
 </body>
 </html>

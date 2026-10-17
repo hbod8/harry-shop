@@ -1,0 +1,7 @@
+{{- with .Params.min_price -}}
+  {{- if ne $.Params.min_price $.Params.max_price -}}
+    from {{ partial "money.html" $.Params.min_price }}
+  {{- else -}}
+    {{ partial "money.html" $.Params.min_price }}
+  {{- end -}}
+{{- end -}}

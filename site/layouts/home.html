@@ -1,4 +1,17 @@
 {{ define "main" }}
-<h1>{{ .Title }}</h1>
-<p>Coming soon.</p>
+<section class="hero">
+  <h1>{{ site.Title }}</h1>
+  <p>{{ site.Params.tagline }}</p>
+  <a href="/products/" role="button">Browse the shop</a>
+</section>
+
+<h2>New in the shop</h2>
+{{ partial "product-grid.html" (first 8 (where site.RegularPages "Section" "products").ByDate.Reverse) }}
+
+{{ with site.GetPage "/collections" }}
+  {{ if .Sections }}
+    <h2>Collections</h2>
+    {{ partial "term-tiles.html" . }}
+  {{ end }}
+{{ end }}
 {{ end }}

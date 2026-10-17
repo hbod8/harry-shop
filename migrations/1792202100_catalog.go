@@ -29,12 +29,11 @@ func init() {
 		addTimestamps(channels)
 		channels.AddIndex("idx_channels_slug", true, "slug", "")
 
-		// Mirrors Hugo: a taxonomy (e.g. "tags") has terms, which are assigned
-		// to products. Taxonomy names are free text; the Hugo build declares
-		// whichever names exist.
+		// Mirrors Hugo: a taxonomy has terms, which are assigned to products.
+		// The third taxonomy, "types", is products.product_type.
 		terms := newCollection("terms", rule(""), rule(""))
 		terms.Fields.Add(
-			&core.TextField{Name: "taxonomy", Required: true, Max: 50, Pattern: slugPattern},
+			choice("taxonomy", true, "tags", "collections"),
 			slugField(),
 			&core.TextField{Name: "name", Required: true, Max: 200},
 			&core.TextField{Name: "description", Max: 2000},
@@ -56,7 +55,7 @@ func init() {
 			choice("product_type", true, "print", "apparel", "chemistry"),
 			&core.TextField{Name: "title", Required: true, Max: 200},
 			slugField(),
-			&core.EditorField{Name: "description"},
+			&core.TextField{Name: "description", Max: 5000}, // plain text; blank lines split paragraphs
 			&core.FileField{
 				Name:      "images",
 				MaxSelect: 10,

@@ -1,0 +1,12 @@
+<a class="card" href="{{ .RelPermalink }}">
+  {{ with index (.Params.images | default slice) 0 }}
+    <img src="{{ partial "image-url.html" (dict "page" $ "file" . "thumb" "600x0") }}"
+         alt="{{ $.Title }}" loading="lazy">
+  {{ else }}
+    <div class="placeholder" aria-hidden="true"><span>{{ .Title }}</span></div>
+  {{ end }}
+  <div class="card-body">
+    <strong>{{ .Title }}</strong>
+    <span class="price">{{ partial "price-range.html" . }}</span>
+  </div>
+</a>

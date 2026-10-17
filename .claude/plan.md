@@ -12,7 +12,7 @@ migrations/             Go migrations (collections, API rules, base config) + AP
 shop/                   Go package: checkout, Stripe webhook, expiry cron, consent hook, dev seed data
   *_test.go             tests using github.com/pocketbase/pocketbase/tests
 site/                   Hugo project (config, layouts, content adapter, static/)
-  static/js/api.js      tiny fetch wrapper: base URL, auth token, JSON errors
+  assets/js/, css/      site JS and CSS, fingerprinted by Hugo so browsers never cache stale copies
   static/vendor/        pico.min.css (v2.1.1), committed
 pb_public/              Hugo build output (gitignored)
 pb_data/                SQLite + uploads (gitignored)
@@ -49,15 +49,14 @@ Makefile                dev, seed, site, test, build targets
   the only hook; everything else admin-side is Harry in `/_/` or a view.
 - **Tests:** sign-up with and without consent, turning it off later.
 
-## Step 4: Public site with Hugo
+## Step 4: Public site with Hugo (done, pending Harry's review)
 - `site/` content adapter `site/content/products/_content.gotmpl`: `resources.GetRemote` on
   `{{ site.Params.api }}/api/collections/products/records?filter=storefront.slug="harry"&expand=terms,variants_via_product`
   (listed products only, by the rules), `transform.Unmarshal`, then `.AddPage` per product with
-  title, slug, description, images, variants, and terms grouped by taxonomy as page params
-  (`tags`, `themes`, `collections`, `types`).
-- `go run . hugo-taxonomies` writes `site/config/_default/taxonomies.toml` from the distinct
-  `terms.taxonomy` values plus `type = "types"`; `make site` runs it before `hugo`. Storefront slug
-  is a site param, so another storefront is another build.
+  title, slug, plain-text description, images, variants, terms and `term_keys` as page params.
+- `site/content/_content.gotmpl` builds taxonomy pages (`/tags/`) and term pages
+  (`/tags/seattle-rain/`) from the `terms` API plus product types; no Hugo taxonomy config.
+  Storefront slug is a site param, so another storefront is another build.
 - Layouts: base (Pico CSS, `api.js`), home, product grid, product page with variant picker and an
   add-to-cart button, taxonomy and term pages, generic `/item/` page for unlisted products, about,
   shipping/returns policy stub.

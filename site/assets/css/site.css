@@ -1,0 +1,95 @@
+/* Site styles on top of Pico CSS. One accent colour; Pico handles dark mode.
+   Selectors match Pico's own theme selectors so these tokens win. */
+:root:not([data-theme="dark"]), [data-theme="light"] {
+  --accent: #2f6f6a;
+  --accent-hover: #255a56;
+  --placeholder: #e7ecec;
+  --placeholder-text: #5a6b6a;
+  --stock-low: #a05a00;
+  --stock-out: #a0302a;
+}
+:root:not([data-theme="dark"]), [data-theme="light"], [data-theme="dark"], :root:not([data-theme]) {
+  --pico-primary: var(--accent);
+  --pico-primary-background: var(--accent);
+  --pico-primary-border: var(--accent);
+  --pico-primary-hover: var(--accent-hover);
+  --pico-primary-hover-background: var(--accent-hover);
+  --pico-primary-hover-border: var(--accent-hover);
+  --pico-primary-underline: color-mix(in srgb, var(--accent) 50%, transparent);
+  --pico-primary-focus: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+[data-theme="dark"] {
+  --accent: #6fb8b1;
+  --accent-hover: #8ccbc5;
+  --placeholder: #1f2a2a;
+  --placeholder-text: #a9bab8;
+  --stock-low: #e0a24a;
+  --stock-out: #e57a72;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --accent: #6fb8b1;
+    --accent-hover: #8ccbc5;
+    --placeholder: #1f2a2a;
+    --placeholder-text: #a9bab8;
+    --stock-low: #e0a24a;
+    --stock-out: #e57a72;
+  }
+}
+
+.site-header nav .brand { font-weight: 700; color: var(--pico-color); text-decoration: none; }
+.site-header nav ul:last-child { flex-wrap: wrap; justify-content: flex-end; }
+.site-footer { margin-top: 4rem; padding-block: 2rem; color: var(--pico-muted-color); }
+.muted { color: var(--pico-muted-color); }
+.muted a { color: inherit; }
+.lead { font-size: 1.15rem; }
+
+.hero { padding-block: 3rem 2rem; }
+.hero h1 { margin-bottom: .5rem; }
+
+/* product grid: big image-led cards */
+.grid-products {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  margin-bottom: 3rem;
+}
+.card { display: block; color: inherit; text-decoration: none; }
+.card img, .card .placeholder { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--pico-border-radius); }
+.card:hover img, .card:hover .placeholder { opacity: .9; }
+.card-body { display: flex; justify-content: space-between; gap: .5rem; padding-top: .6rem; }
+.card-body .price { color: var(--pico-muted-color); white-space: nowrap; }
+
+.placeholder {
+  display: grid; place-items: center; text-align: center; padding: 1rem;
+  background: var(--placeholder); color: var(--placeholder-text);
+}
+.placeholder.large { aspect-ratio: 4 / 5; border-radius: var(--pico-border-radius); font-size: 1.25rem; }
+
+/* taxonomy term tiles and chips */
+.grid-terms { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); margin-bottom: 3rem; }
+.term {
+  display: flex; flex-direction: column; padding: 1rem;
+  border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius);
+  color: inherit; text-decoration: none;
+}
+.term:hover { border-color: var(--accent); }
+.term small { color: var(--pico-muted-color); }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chips > * {
+  padding: .2rem .75rem; border-radius: 999px; font-size: .9rem; text-decoration: none;
+  border: 1px solid var(--pico-muted-border-color); color: inherit;
+}
+.chips a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }
+
+/* product page: image left, details right; stacked on phones */
+.product { display: grid; gap: 2rem; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; }
+@media (max-width: 768px) { .product { grid-template-columns: minmax(0, 1fr); } }
+.gallery img { width: 100%; border-radius: var(--pico-border-radius); }
+.thumbs { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); margin-top: .5rem; }
+.price.large { font-size: 1.4rem; }
+.variants th { font-weight: 600; }
+.stock { white-space: nowrap; color: var(--pico-muted-color); }
+.stock[data-level="low"] { color: var(--stock-low); }
+.stock[data-level="out"] { color: var(--stock-out); }
+.prose { max-width: 65ch; }

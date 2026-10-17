@@ -1,0 +1,6 @@
+{{- /* every term on a product, linking to its term page */ -}}
+{{- with .Params.terms -}}
+  <p class="chips">
+    {{- range . }}<a href="/{{ .taxonomy }}/{{ .slug }}/">{{ .name }}</a>{{ end -}}
+  </p>
+{{- end -}}

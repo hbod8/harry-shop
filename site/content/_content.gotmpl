@@ -1,0 +1,48 @@
+{{/*
+  Taxonomy pages, mirroring Hugo's model: a taxonomy (/tags/) lists its
+  terms; a term (/tags/seattle-rain/) lists the products carrying it.
+  Three taxonomies: tags and collections from the terms collection, and
+  types from products.product_type. Built here rather than with Hugo's
+  built-in taxonomies.
+*/}}
+{{ $taxonomies := dict "tags" slice "collections" slice }}
+
+{{ $url := printf "%s/api/collections/terms/records?perPage=500&sort=name" site.Params.api }}
+{{ with try (resources.GetRemote $url) }}
+  {{ with .Err }}
+    {{ errorf "fetching terms from %s: %s (is PocketBase running?)" site.Params.api . }}
+  {{ else with .Value }}
+    {{ range (. | transform.Unmarshal).items }}
+      {{ if isset $taxonomies .taxonomy }}
+      {{ $taxonomies = merge $taxonomies (dict .taxonomy ((index $taxonomies .taxonomy) | append (dict "slug" .slug "name" .name "description" .description))) }}
+      {{ end }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{ $types := slice }}
+{{ range slice "print" "apparel" "chemistry" }}
+  {{ $types = $types | append (dict "slug" . "name" (title .) "description" "") }}
+{{ end }}
+{{ $taxonomies = merge $taxonomies (dict "types" $types) }}
+
+{{ range $taxonomy, $terms := $taxonomies }}
+  {{ $.AddPage (dict
+    "kind" "section"
+    "path" $taxonomy
+    "title" (title $taxonomy)
+    "params" (dict "taxonomy" $taxonomy)
+  ) }}
+  {{ range $terms }}
+    {{ $.AddPage (dict
+      "kind" "section"
+      "path" (printf "%s/%s" $taxonomy .slug)
+      "title" .name
+      "params" (dict
+        "taxonomy" $taxonomy
+        "term_key" (printf "%s/%s" $taxonomy .slug)
+        "description" .description
+      )
+    ) }}
+  {{ end }}
+{{ end }}

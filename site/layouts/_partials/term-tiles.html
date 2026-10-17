@@ -1,0 +1,12 @@
+{{- /* tiles for a taxonomy's terms that have products */ -}}
+<div class="grid-terms">
+  {{ range .Sections.ByTitle }}
+    {{ $count := len (partial "products-with-term.html" .Params.term_key) }}
+    {{ if $count }}
+      <a class="term" href="{{ .RelPermalink }}">
+        <strong>{{ .Title }}</strong>
+        <small>{{ $count }} {{ cond (eq $count 1) "item" "items" }}</small>
+      </a>
+    {{ end }}
+  {{ end }}
+</div>

@@ -1,0 +1,12 @@
+{{ define "head" }}
+  <meta name="robots" content="noindex">
+  <script src="{{ partial "asset.html" "js/stock.js" }}" defer></script>
+  <script src="{{ partial "asset.html" "js/item.js" }}" defer></script>
+{{ end }}
+{{ define "main" }}
+{{/* Unlisted products: filled in by item.js from /item/#<product id>. */}}
+<article class="product" id="item">
+  <p aria-busy="true">Loading…</p>
+</article>
+<noscript><p>This page needs JavaScript.</p></noscript>
+{{ end }}

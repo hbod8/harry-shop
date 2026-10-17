@@ -3,3 +3,4 @@ pb_public/
 .env
 /harry-shop
 .hugo_build.lock
+site/resources/

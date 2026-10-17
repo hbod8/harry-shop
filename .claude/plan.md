@@ -26,7 +26,7 @@ Makefile                dev, seed, site, test, build targets
 - Proof of concept (a `clicks` counter over the collection API, since removed) confirmed the
   API-first approach.
 
-## Step 2: All collections and rules (Harry reviews in `/_/` before any Hugo work)
+## Step 2: All collections and rules (done)
 - Migrations for every collection in `background.md`: `storefronts`, `channels`, `terms`,
   `products`, `variants`, the extra `users` fields (and OTP), `user_notes`, `orders`,
   `order_lines` (the ledger), `stripe_events`, the `order_totals` view, and admin views
@@ -44,12 +44,7 @@ Makefile                dev, seed, site, test, build targets
 - **Try it:** `make dev`, `make seed`, browse every collection in http://127.0.0.1:8090/_/ and try
   the API rules with curl.
 
-## Step 3: Consent hook
-- `users`: set `consent_at` when `marketing_consent` turns on, clear it when it turns off. This is
-  the only hook; everything else admin-side is Harry in `/_/` or a view.
-- **Tests:** sign-up with and without consent, turning it off later.
-
-## Step 4: Public site with Hugo (done, pending Harry's review)
+## Step 4: Public site with Hugo (done)
 - `site/` content adapter `site/content/products/_content.gotmpl`: `resources.GetRemote` on
   `{{ site.Params.api }}/api/collections/products/records?filter=storefront.slug="harry"&expand=terms,variants_via_product`
   (listed products only, by the rules), `transform.Unmarshal`, then `.AddPage` per product with
@@ -65,7 +60,7 @@ Makefile                dev, seed, site, test, build targets
 - Design: plain, image-led grid; big photos; one accent color via Pico CSS variables; works on phones.
 - **Try it:** `make site`, browse products, tags and an unlisted item link.
 
-## Step 5: Live stock and cart (JS + collection API only)
+## Step 5: Live stock and cart (JS + collection API only) (done, pending Harry's review)
 - Product pages fetch the variant and show "In stock", "2 left" or "Sold out" from
   `on_hand - reserved` (computed in the page).
 - Cart lives in `localStorage` as `[{variant, qty}]` (max ~20 lines). Header badge reads it.
@@ -104,6 +99,9 @@ Makefile                dev, seed, site, test, build targets
   line and `order_totals.payment_status = refunded`.
 
 ## Step 8: Accounts and group buys
+- Consent hook (moved here from the old Step 3, since sign-up is where consent is collected):
+  `users` sets `consent_at` when `marketing_consent` turns on and clears it when it turns off.
+  Tests: sign-up with and without consent, turning it off later.
 - Hugo pages `/login/` (email OTP, or password), `/account/` and `/account/order/?id=...` using
   PocketBase's auth API. `api.js` keeps the token in `localStorage`. The order page shows the
   lines (quoted vs final price, payments) and the `order_totals` row.

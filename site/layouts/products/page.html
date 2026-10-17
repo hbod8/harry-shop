@@ -37,7 +37,20 @@
         </tbody>
       </table>
     {{ end }}
-    <p class="muted"><small>Ordering opens soon.</small></p>
+    {{ with .Params.variants }}
+      <form class="add-to-cart" data-add-to-cart>
+        <div class="add-row">
+          <select name="variant" aria-label="Option">
+            {{ range . }}
+              <option value="{{ .id }}" data-name="{{ $.Title }} — {{ .name }}">{{ .name }} · {{ partial "money.html" .price_cents }}</option>
+            {{ end }}
+          </select>
+          <input type="number" name="qty" value="1" min="1" max="99" aria-label="Quantity">
+          <button type="submit">Add to cart</button>
+        </div>
+        <p class="muted" data-cart-status role="status"></p>
+      </form>
+    {{ end }}
 
     <div class="prose">{{ partial "plaintext.html" .Params.description }}</div>
     {{ partial "term-chips.html" . }}

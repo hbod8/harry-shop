@@ -93,3 +93,32 @@
 .stock[data-level="low"] { color: var(--stock-low); }
 .stock[data-level="out"] { color: var(--stock-out); }
 .prose { max-width: 65ch; }
+
+/* add to cart */
+.add-to-cart { margin-block: 1rem; }
+.add-row { display: grid; gap: 0 .75rem; grid-template-columns: minmax(0, 1fr) 5.5rem; }
+.add-row button { grid-column: 1 / -1; width: 100%; }
+
+/* cart page: image, name, qty, total, remove; wraps on phones */
+.cart-lines { list-style: none; padding: 0; }
+.cart-line {
+  display: grid; gap: .75rem 1rem; align-items: center;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 6rem 5rem auto;
+  padding-block: 1rem; border-bottom: 1px solid var(--pico-muted-border-color);
+}
+.cart-line li { list-style: none; }
+.cart-image img, .cart-image .placeholder { width: 4.5rem; aspect-ratio: 4 / 5; object-fit: cover; border-radius: var(--pico-border-radius); }
+.cart-name { display: flex; flex-direction: column; }
+.cart-qty input, .cart-remove button { margin: 0; }
+.cart-total { text-align: right; }
+.cart-subtotal { text-align: right; font-size: 1.2rem; margin-top: 1rem; }
+@media (max-width: 600px) {
+  .cart-line { grid-template-columns: 4.5rem minmax(0, 1fr) auto; }
+  .cart-qty { grid-column: 2; }
+  .cart-total { grid-column: 3; grid-row: 1; }
+  .cart-remove { grid-column: 3; }
+}
+.notice {
+  padding: .75rem 1rem; border-radius: var(--pico-border-radius);
+  border-left: 4px solid var(--stock-low); background: var(--pico-card-background-color);
+}

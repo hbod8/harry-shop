@@ -43,12 +43,26 @@
     el("h1", {}, p.title),
     el("p", { class: "price large" }, prices.length ? (min === max ? money(min) : `from ${money(min)}`) : ""),
     rows.length ? el("table", { class: "variants" }, el("tbody", {}, ...rows)) : "",
-    el("p", { class: "muted" }, el("small", {}, "Ordering opens soon.")),
+    variants.length ? addToCartForm(p, variants) : "",
     el("div", { class: "prose" }, ...paragraphs(p.description)),
     chips.length ? el("p", { class: "chips" }, ...chips) : ""));
 
   shop.showStock(variants);
+  const form = root.querySelector("form[data-add-to-cart]");
+  if (form) shop.wireAddToCart(form);
 })();
+
+function addToCartForm(p, variants) {
+  const { el, money } = shop;
+  const options = variants.map((v) =>
+    el("option", { value: v.id, "data-name": `${p.title} — ${v.name}` }, `${v.name} · ${money(v.price_cents)}`));
+  return el("form", { class: "add-to-cart", "data-add-to-cart": "" },
+    el("div", { class: "add-row" },
+      el("select", { name: "variant", "aria-label": "Option" }, ...options),
+      el("input", { type: "number", name: "qty", value: "1", min: "1", max: "99", "aria-label": "Quantity" }),
+      el("button", { type: "submit" }, "Add to cart")),
+    el("p", { class: "muted", "data-cart-status": "", role: "status" }));
+}
 
 // The description is plain text: blank lines split paragraphs, single
 // newlines become line breaks. Built with text nodes, so never markup.

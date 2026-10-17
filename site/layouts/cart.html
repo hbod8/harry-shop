@@ -1,0 +1,9 @@
+{{ define "head" }}
+  <meta name="robots" content="noindex">
+  <script src="{{ partial "asset.html" "js/cart-page.js" }}" defer></script>
+{{ end }}
+{{ define "main" }}
+<h1>Cart</h1>
+<div id="cart"><p aria-busy="true">Loading your cart…</p></div>
+<noscript><p>The cart needs JavaScript.</p></noscript>
+{{ end }}

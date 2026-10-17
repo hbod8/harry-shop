@@ -106,11 +106,11 @@ users ─< orders >── storefront, channel        users ─< user_notes
 | `storefronts` | `slug` (unique), `name`, `domain` | public | admin |
 | `channels` | `slug` (unique), `name`, `provider` (stripe, manual), `active` | public | admin |
 | `terms` | `taxonomy` (select: tags, collections), `slug`, `name`, `description`; unique (taxonomy, slug) | public | admin |
-| `products` | `storefront` (single), `product_type` (select: print, apparel, chemistry), `title`, `slug`, `description` (plain text; blank lines split paragraphs), `images` (files, thumbs 600x0/1200x0), `tax_code`, `terms` (multi), `channels` (multi, required), `listed`, `active`; unique (storefront, slug) | list `active && listed`, view `active` | admin |
+| `products` | `storefront` (single), `product_type` (select: print, apparel, chemistry), `title`, `slug`, `description` (plain text; blank lines split paragraphs), `images` (files, thumbs 600x0/1200x0), `tax_code`, `terms` (multi), `channel` (single, required), `listed`, `active`; unique (storefront, slug) | list `active && listed`, view `active` | admin |
 | `variants` | `product` (no cascade), `sku` (unique), `name`, `price_cents`, `on_hand`, `reserved`, `position` | list `product.active && product.listed`, view `product.active` | admin and Go |
 | `users` (built in) | + `phone`, `discord`, `marketing_consent`, `consent_at`; OTP enabled | own record | sign-up via API; hook sets `consent_at` |
 | `user_notes` | `user` (cascade), `order` (optional), `source` (discord, in_person, email, other), `body` | locked | admin |
-| `orders` | `storefront`, `channel`, `user` (required), `email`, `name`, `phone`, `ship_line1`, `ship_line2`, `ship_city`, `ship_state`, `ship_postal`, `ship_country`, `status`, `tracking_number`, `stripe_session_id` (unique if set), `stripe_payment_intent`, `stripe_customer`, `expires_at` | own (`user = @request.auth.id`) or matching `?session_id=` | Go and admin |
+| `orders` | `number` (sequential from 1001, unique, set by a hook; for people), `storefront`, `channel`, `user` (required), `email`, `name`, `phone`, `ship_line1`, `ship_line2`, `ship_city`, `ship_state`, `ship_postal`, `ship_country`, `status`, `tracking_number`, `stripe_session_id` (unique if set), `stripe_payment_intent`, `stripe_customer`, `expires_at` | own (`user = @request.auth.id`) or matching `?session_id=` | Go and admin |
 | `order_lines` | `order` (no cascade), `kind` (item, shipping, tax, payment, refund), `variant` (items), `sku`, `name`, `quantity` (≥ 1), `quoted_cents` (items), `unit_cents`, `channel` (payments and refunds: how the money came in), `external_ref` (unique if set), `note` | via parent order, same as above | Go and admin |
 | `order_totals` (view) | per order: `user`, `storefront`, `channel`, `status`, `stripe_session_id`, `total`, `paid`, `balance`, `payment_status` | same as orders | read only |
 | `customers` (view) | per user: contact fields, `note_count`, `notes` (all notes, newest first, one per line) | locked | read only |
@@ -128,9 +128,9 @@ users ─< orders >── storefront, channel        users ─< user_notes
 - **Descriptions are plain text**, rendered as escaped paragraphs, so Hugo's default content
   security policy (no raw HTML) stays untouched. Only the local-API fetch rule in
   `[security.http]` is changed.
-- **Channels are chosen per order.** A product lists the channels it may be paid through. At
-  checkout the cart's channel must be allowed by every product in it; if both card and manual
-  fit, the buyer picks; if none fits, checkout refuses ("order these separately"). Stock is
+- **One channel per product.** Each product is paid through exactly one channel (card or
+  manual). An order's channel is derived from its products at checkout, never sent by the
+  browser; a cart mixing channels is refused ("order these separately"). Stock is
   shared across channels. Per-channel prices are deferred: add a `price_overrides` table
   (variant, channel, cents) if ever needed.
 - **Order lines are the ledger.** Every amount on an order is a line: `item`, `shipping` and
@@ -144,12 +144,20 @@ users ─< orders >── storefront, channel        users ─< user_notes
 - **Totals are never stored.** The `order_totals` view computes `total` = items + shipping + tax,
   `paid` = payments − refunds, `balance` = total − paid, and `payment_status`: `unpaid` (no
   payments), `refunded` (paid back to 0 or less), `partial`, `paid`, `overpaid`.
-- **Order `status`** (set by Harry in `/_/`; code only sets it for Stripe orders):
-  `unconfirmed` (checkout open, or group-buy order placed), `confirmed` (Stripe paid, or Harry
-  placed the bulk order), `fulfilled` (shipped or picked up), `cancelled`. Fulfilling with a
+- **Order `status`** (set by Harry in `/_/`; code only sets it at checkout and for Stripe
+  events). Close to WooCommerce's statuses ("pending payment", "on hold"):
+  - `pending`: card checkout started, not paid; stock reserved; cancelled automatically if
+    abandoned (Stripe's expired event, or the 15-minute cron).
+  - `unconfirmed`: submitted, price not final (group buys); no stock reserved.
+  - `confirmed`: Stripe paid, or Harry placed the bulk order.
+  - `fulfilled`: shipped or picked up. `cancelled`: abandoned checkout or cancelled by Harry. Fulfilling with a
   balance owed is allowed; a view of fulfilled orders with `balance > 0` is the warning.
 - **Stock** moves automatically only for Stripe orders. Harry adjusts `on_hand` by hand for
   stocked items sold manually; group-buy items don't need it.
+- **Ids and numbers.** Records use PocketBase's random ids; links such as order pages rely on
+  them being unguessable. Orders also get a sequential `number` (#1001, ...) for customer
+  support. Presentable fields (shown in admin relation pickers): orders number + email, users
+  email, variants sku, products title.
 - Plain address columns, SKUs, consent and Stripe IDs are deliberate: they map onto
   Shopify/WooCommerce CSV imports if Harry ever moves.
 
@@ -163,7 +171,7 @@ work in embedded Checkout). Labels are bought by hand from a CSV export of ready
 - Checkout Session with inline `PriceData` (currency usd, unit amount, `ProductData{Name, TaxCode}`),
   `AutomaticTax` on, shipping address collection US only, `ClientReferenceID = order.Id`,
   `ExpiresAt = now + 30 min` (Stripe's minimum; max 24 h).
-- Reserve stock and create the `unconfirmed` order in one `app.RunInTransaction`, with
+- Reserve stock and create the `pending` order in one `app.RunInTransaction`, with
   `UPDATE variants SET reserved = reserved + q WHERE id = ? AND on_hand - reserved >= q`
   and fail the whole cart if any row isn't affected.
 - Webhook: read raw body, `webhook.ConstructEvent(body, sigHeader, whsec)`, then in one
@@ -174,7 +182,7 @@ work in embedded Checkout). Labels are bought by hand from a CSV export of ready
     `payment` line (`channel = card`, `external_ref` = payment intent id); `status = confirmed`.
   - `checkout.session.expired`: `reserved -= q`; `status = cancelled`.
   - `charge.refunded`: add a `refund` line (`external_ref` = refund id).
-- Cron every 15 min releases reservations on unconfirmed Stripe orders past `expires_at` (backup for a
+- Cron every 15 min releases reservations on `pending` orders past `expires_at` (backup for a
   missed expired event).
 - Stripe retries live webhooks up to 3 days and can send duplicates; the unique index absorbs them.
 - Local: `stripe listen --forward-to localhost:8090/shop/stripe/webhook`, use the `whsec_...` it prints.

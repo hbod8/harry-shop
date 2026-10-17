@@ -25,8 +25,10 @@ require (
 	github.com/pocketbase/dbx v1.12.0 // indirect
 	github.com/pocketbase/ozzo-validation/v4 v4.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
+	github.com/stripe/stripe-go/v87 v87.0.0 // indirect
 	golang.org/x/crypto v0.57.0 // indirect
 	golang.org/x/image v0.46.0 // indirect
 	golang.org/x/net v0.59.0 // indirect

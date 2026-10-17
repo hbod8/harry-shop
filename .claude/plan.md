@@ -60,7 +60,7 @@ Makefile                dev, seed, site, test, build targets
 - Design: plain, image-led grid; big photos; one accent color via Pico CSS variables; works on phones.
 - **Try it:** `make site`, browse products, tags and an unlisted item link.
 
-## Step 5: Live stock and cart (JS + collection API only) (done, pending Harry's review)
+## Step 5: Live stock and cart (JS + collection API only) (done)
 - Product pages fetch the variant and show "In stock", "2 left" or "Sold out" from
   `on_hand - reserved` (computed in the page).
 - Cart lives in `localStorage` as `[{variant, qty}]` (max ~20 lines). Header badge reads it.
@@ -69,10 +69,10 @@ Makefile                dev, seed, site, test, build targets
   which channels (card, manual) the whole cart allows. Displayed prices are for show only.
 - **Try it:** add items, reload, change quantities, deactivate a product in `/_/` and see it drop.
 
-## Step 6: Checkout and webhook in a Stripe sandbox
+## Step 6: Checkout and webhook in a Stripe sandbox (done; sandbox payment tested by Harry)
 - `POST /shop/checkout` (JSON `{lines:[{variant, qty}], channel, email, name}`): validate lines,
   check every product allows the channel (else 400 "order these separately"), reprice from the DB,
-  find or create the user by email, then in one transaction create the `unconfirmed` order and
+  find or create the user by email, then in one transaction create the order (`pending` for card, `unconfirmed` for manual) and
   its `item` lines with `quoted_cents = unit_cents = price_cents` (plus a `shipping` line for
   shipped card orders).
   - `card`: reserve stock, create the Stripe session, return `{url}`. Out of stock = 409 with the
@@ -90,8 +90,19 @@ Makefile                dev, seed, site, test, build targets
     completed confirms the order, moves stock and adds tax and payment lines, a duplicate event
     is a no-op, expired releases stock and cancels, refunded adds a refund line.
 - **Try it:** `.env` with sandbox keys, `stripe listen --forward-to localhost:8090/shop/stripe/webhook`,
-  buy with 4242 4242 4242 4242, watch the order go `unconfirmed` to `confirmed` and its
+  buy with 4242 4242 4242 4242, watch the order go `pending` to `confirmed` and its
   `order_totals` row to `paid`.
+
+## Next (requested 2026-10-16, to design with Harry on 2026-10-17)
+- **Made-to-order items.** Products that aren't stocked: instead of `on_hand`, a cap on how
+  many can be ordered (overall and/or per order) and a closing date after which they can't be
+  ordered. To settle: cap per variant or per product; whether pending card checkouts count
+  against the cap; what happens at the closing date (hide, or show "closed"); whether this
+  replaces "deactivate the product" for group buys.
+- **Order emails.** Confirmation when an order is placed or paid, and updates when Harry changes
+  the status (confirmed, fulfilled with tracking, cancelled). To settle: which transitions send
+  mail; sending via PocketBase's mailer (SMTP settings in `/_/`) from record hooks; plain-text or
+  HTML templates; a record of what was sent; dev setup that doesn't email real people.
 
 ## Step 7: Expiry and refunds by hand
 - **Try it:** abandon a checkout (or `stripe trigger checkout.session.expired`); confirm `reserved`
@@ -125,4 +136,4 @@ Makefile                dev, seed, site, test, build targets
 
 ## Before go-live (Harry's checklist, not code)
 - Washington DOR registration; add WA registration in Stripe Tax; live keys and live webhook
-  endpoint subscribed to the three events; test restore done; shipping and returns policy written.
+  endpoint subscribed to the four events in `STRIPE_EVENTS` (Makefile); test restore done; shipping and returns policy written.

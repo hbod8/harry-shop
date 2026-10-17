@@ -1,0 +1,9 @@
+{{ define "head" }}
+  <meta name="robots" content="noindex">
+  <script src="{{ partial "asset.html" "js/order.js" }}" defer></script>
+{{ end }}
+{{ define "main" }}
+<h1>Your order</h1>
+<div id="order"><p aria-busy="true">Loading your order…</p></div>
+<noscript><p>This page needs JavaScript.</p></noscript>
+{{ end }}

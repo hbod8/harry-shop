@@ -16,7 +16,7 @@ var ErrAlreadySeeded = errors.New("sample data already present")
 
 // Seed adds dev sample data: terms, products, variants, two customers with
 // notes, and four orders: an unconfirmed group buy ($36, $20 paid by Zelle),
-// an unconfirmed guest card order ($35 + $6 shipping), a confirmed paid tee
+// a pending guest card checkout ($35 + $6 shipping), a confirmed paid tee
 // and a fulfilled print.
 // It is for local development only and is never run as a migration.
 // Every record gets a generated id; find them by slug, sku or email.
@@ -36,7 +36,7 @@ func Seed(app core.App) error {
 		bw := s.add("terms", map[string]any{"taxonomy": "tags", "slug": "black-and-white", "name": "Black and White"})
 		holiday := s.add("terms", map[string]any{"taxonomy": "collections", "slug": "holiday-2026", "name": "Holiday 2026", "description": "Gift picks for the 2026 holidays."})
 
-		product := func(productType, title, slug string, terms, channels []string, listed, active bool) string {
+		product := func(productType, title, slug string, terms []string, channel string, listed, active bool) string {
 			return s.add("products", map[string]any{
 				"storefront":   harry,
 				"product_type": productType,
@@ -44,7 +44,7 @@ func Seed(app core.App) error {
 				"slug":         slug,
 				"description":  title + ".\n\nPrinted and packed by hand in Seattle.",
 				"terms":        terms,
-				"channels":     channels,
+				"channel":      channel,
 				"listed":       listed,
 				"active":       active,
 			})
@@ -56,22 +56,22 @@ func Seed(app core.App) error {
 			})
 		}
 
-		pike := product("print", "Pike Place at Dawn", "pike-place-at-dawn", []string{rain, holiday}, []string{card}, true, true)
+		pike := product("print", "Pike Place at Dawn", "pike-place-at-dawn", []string{rain, holiday}, card, true, true)
 		pike8x10 := variant(pike, "PRINT-PIKE-8X10", "8×10", 3500, 5, 1)
 		variant(pike, "PRINT-PIKE-11X14", "11×14", 6000, 2, 2)
 
-		rainier := product("print", "Rainier from Kerry Park", "rainier-from-kerry-park", []string{rain, bw}, []string{card}, true, true)
+		rainier := product("print", "Rainier from Kerry Park", "rainier-from-kerry-park", []string{rain, bw}, card, true, true)
 		rainier8x10 := variant(rainier, "PRINT-RAINIER-8X10", "8×10", 3500, 3, 1)
 
-		tee := product("apparel", "Harry Logo Tee", "harry-logo-tee", []string{holiday}, []string{card, manual}, true, true)
+		tee := product("apparel", "Harry Logo Tee", "harry-logo-tee", []string{holiday}, card, true, true)
 		variant(tee, "TEE-LOGO-S", "S", 2800, 4, 1)
 		teeM := variant(tee, "TEE-LOGO-M", "M", 2800, 6, 2)
 		variant(tee, "TEE-LOGO-L", "L", 2800, 0, 3)
 
-		developer := product("chemistry", "Developer, round 1, Nov 2026", "developer-round-1", nil, []string{manual}, false, true)
+		developer := product("chemistry", "Developer, round 1, Nov 2026", "developer-round-1", nil, manual, false, true)
 		developer1L := variant(developer, "CHEM-DEV-R1-1L", "1 L", 1800, 20, 1)
 
-		retired := product("print", "Retired Print", "retired-print", nil, []string{card}, true, false)
+		retired := product("print", "Retired Print", "retired-print", nil, card, true, false)
 		variant(retired, "PRINT-RETIRED-8X10", "8×10", 3000, 1, 1)
 
 		sam := s.user("sam@example.com", "Sam Buyer", "sam.buyer")
@@ -132,7 +132,7 @@ func Seed(app core.App) error {
 
 		guestOrder := s.add("orders", map[string]any{
 			"storefront": harry, "channel": card, "user": guest,
-			"email": "guest@example.com", "name": "Guest Buyer", "status": "unconfirmed",
+			"email": "guest@example.com", "name": "Guest Buyer", "status": "pending",
 			"stripe_session_id": SeedGuestSession,
 		})
 		s.add("order_lines", map[string]any{

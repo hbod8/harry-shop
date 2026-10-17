@@ -7,11 +7,12 @@ import (
 
 // stats: one row per period (admin only).
 //
-//	orders              orders placed in the period, excluding cancelled
+//	orders              orders placed in the period, excluding cancelled orders
+//	                    and pending (unpaid) card checkouts
 //	revenue             item lines of confirmed and fulfilled orders placed in
 //	                    the period, minus their refunds; excludes tax, shipping
-//	                    and unconfirmed orders (unpaid checkouts, estimates)
-//	new_customers       customers whose first non-cancelled order is in the period
+//	                    and pending or unconfirmed orders (unpaid, estimates)
+//	new_customers       customers whose first counted order is in the period
 //	returning_customers customers who ordered in the period and had ordered before it
 //
 // Periods use the server's local time ("localtime"), so production must run
@@ -24,7 +25,7 @@ SELECT
   CAST(p.start AS TEXT)     AS since,
   CAST((
     SELECT COUNT(*) FROM orders o
-    WHERE o.status != 'cancelled' AND datetime(o.created, 'localtime') >= p.start
+    WHERE o.status NOT IN ('cancelled', 'pending') AND datetime(o.created, 'localtime') >= p.start
   ) AS INTEGER) AS orders,
   CAST((
     SELECT COALESCE(SUM(CASE l.kind
@@ -38,16 +39,16 @@ SELECT
   CAST((
     SELECT COUNT(*) FROM (
       SELECT MIN(o.created) AS first_order FROM orders o
-      WHERE o.status != 'cancelled' GROUP BY o.user
+      WHERE o.status NOT IN ('cancelled', 'pending') GROUP BY o.user
     ) f
     WHERE datetime(f.first_order, 'localtime') >= p.start
   ) AS INTEGER) AS new_customers,
   CAST((
     SELECT COUNT(DISTINCT o.user) FROM orders o
-    WHERE o.status != 'cancelled' AND datetime(o.created, 'localtime') >= p.start
+    WHERE o.status NOT IN ('cancelled', 'pending') AND datetime(o.created, 'localtime') >= p.start
       AND EXISTS (
         SELECT 1 FROM orders e
-        WHERE e.user = o.user AND e.status != 'cancelled'
+        WHERE e.user = o.user AND e.status NOT IN ('cancelled', 'pending')
           AND datetime(e.created, 'localtime') < p.start
       )
   ) AS INTEGER) AS returning_customers

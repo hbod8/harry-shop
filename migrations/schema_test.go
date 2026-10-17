@@ -22,6 +22,7 @@ func seededApp(t testing.TB) *tests.TestApp {
 	if err != nil {
 		t.Fatal(err)
 	}
+	shop.RegisterHooks(app)
 	if err := shop.Seed(app); err != nil {
 		t.Fatal(err)
 	}
@@ -333,13 +334,13 @@ func TestConstraints(t *testing.T) {
 	mustFail("bad slug", save("terms", map[string]any{"taxonomy": "tags", "slug": "Seattle Rain", "name": "x"}))
 	mustFail("unknown taxonomy", save("terms", map[string]any{"taxonomy": "themes", "slug": "x", "name": "x"}))
 	mustFail("duplicate product slug in a storefront", save("products", map[string]any{
-		"storefront": harry.Id, "product_type": "print", "title": "x", "slug": "pike-place-at-dawn", "channels": []string{manual.Id},
+		"storefront": harry.Id, "product_type": "print", "title": "x", "slug": "pike-place-at-dawn", "channel": manual.Id,
 	}))
 	mustFail("product without a channel", save("products", map[string]any{
 		"storefront": harry.Id, "product_type": "print", "title": "x", "slug": "no-channel",
 	}))
 	mustFail("unknown product type", save("products", map[string]any{
-		"storefront": harry.Id, "product_type": "accessory", "title": "x", "slug": "bad-type", "channels": []string{manual.Id},
+		"storefront": harry.Id, "product_type": "accessory", "title": "x", "slug": "bad-type", "channel": manual.Id,
 	}))
 	mustFail("negative stock", save("variants", map[string]any{"product": id.tee, "sku": "TEE-NEG", "name": "x", "on_hand": -1}))
 	mustFail("fractional cents", save("variants", map[string]any{"product": id.tee, "sku": "TEE-FRAC", "name": "x", "price_cents": 10.5}))
@@ -477,9 +478,9 @@ func TestAdminViews(t *testing.T) {
 		return got
 	}
 	unconfirmed := statusOf("orders_unconfirmed")
-	if len(unconfirmed) != 2 ||
-		unconfirmed[id.groupOrder] != "2× Developer, round 1, Nov 2026 — 1 L | partial" ||
-		unconfirmed[id.guestOrder] != "1× Pike Place at Dawn — 8×10 | unpaid" {
+	// the guest's card checkout is pending, not unconfirmed, so it isn't listed
+	if len(unconfirmed) != 1 ||
+		unconfirmed[id.groupOrder] != "2× Developer, round 1, Nov 2026 — 1 L | partial" {
 		t.Errorf("orders_unconfirmed = %v", unconfirmed)
 	}
 	confirmed := statusOf("orders_confirmed")
@@ -525,12 +526,12 @@ func TestStats(t *testing.T) {
 		t.Fatalf("got %d periods, want %d", len(rows), len(want))
 	}
 	for _, r := range rows {
-		// in every period: 3 recent orders; revenue is only the confirmed $28 tee
-		// (unconfirmed orders and the guest's $6 shipping don't count); Sam new,
-		// guest returning
+		// in every period: Sam's 2 orders count (the guest's pending checkout
+		// doesn't); revenue is only the confirmed $28 tee; Sam is new, and the
+		// guest isn't returning because their only recent order is pending
 		got := [4]int{r.GetInt("orders"), r.GetInt("revenue"), r.GetInt("new_customers"), r.GetInt("returning_customers")}
-		if got != [4]int{3, 2800, 1, 1} {
-			t.Errorf("%s: orders, revenue, new, returning = %v, want [3 2800 1 1]", r.Id, got)
+		if got != [4]int{2, 2800, 1, 0} {
+			t.Errorf("%s: orders, revenue, new, returning = %v, want [2 2800 1 0]", r.Id, got)
 		}
 	}
 }

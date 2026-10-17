@@ -39,14 +39,19 @@ FROM orders o
 LEFT JOIN order_lines l ON l."order" = o.id
 GROUP BY o.id`
 
-func init() {
-	// TOTAL, PAYMENTS and PAID in the query stand for these sums.
+// orderTotalsSQL is orderTotalsQuery with TOTAL, PAYMENTS and PAID
+// replaced by the sums they stand for.
+func orderTotalsSQL() string {
 	amount := "l.quantity * l.unit_cents"
-	query := strings.NewReplacer(
+	return strings.NewReplacer(
 		"TOTAL", "COALESCE(SUM(CASE WHEN l.kind IN ('item', 'shipping', 'tax') THEN "+amount+" END), 0)",
 		"PAYMENTS", "COALESCE(SUM(CASE WHEN l.kind = 'payment' THEN "+amount+" END), 0)",
 		"PAID", "COALESCE(SUM(CASE l.kind WHEN 'payment' THEN "+amount+" WHEN 'refund' THEN -"+amount+" END), 0)",
 	).Replace(orderTotalsQuery)
+}
+
+func init() {
+	query := orderTotalsSQL()
 
 	m.Register(func(app core.App) error {
 		ownOrSession := rule(`(@request.auth.id != "" && user = @request.auth.id) || ` +

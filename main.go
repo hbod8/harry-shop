@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -24,6 +25,31 @@ func main() {
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		TemplateLang: migratecmd.TemplateLangGo,
 		Automigrate:  osutils.IsProbablyGoRun(),
+	})
+
+	shop.RegisterHooks(app)
+
+	cfg := shop.ConfigFromEnv()
+	var payments shop.Payments
+	if p := shop.NewStripePayments(cfg); p != nil {
+		payments = p
+	}
+
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		if payments == nil {
+			se.App.Logger().Warn("STRIPE_SECRET_KEY not set: card checkout is disabled")
+		}
+		shop.Register(se, cfg, payments)
+		return se.Next()
+	})
+
+	// backstop for missed checkout.session.expired events
+	app.Cron().MustAdd("release_expired", "*/15 * * * *", func() {
+		if n, err := shop.ReleaseExpired(app, time.Now()); err != nil {
+			app.Logger().Error("releasing expired orders", "error", err)
+		} else if n > 0 {
+			app.Logger().Info("released expired orders", "count", n)
+		}
 	})
 
 	app.RootCmd.AddCommand(&cobra.Command{

@@ -1,6 +1,6 @@
 // The cart page: re-reads every line's variant (and its product) from the
 // API, drops lines that are gone or inactive, caps quantities at what's in
-// stock, and shows which payment channels the whole cart allows. Prices
+// stock, and shows how the cart will be paid (one channel per cart). Prices
 // shown here are for display; checkout reprices on the server.
 (async () => {
   const root = document.getElementById("cart");
@@ -108,26 +108,74 @@
       el("ul", { class: "cart-lines" }, ...rows),
       el("p", { class: "cart-subtotal" }, "Subtotal ", el("strong", {}, money(subtotal))),
       el("p", { class: "muted" }, el("small", {}, "Shipping and tax are added at checkout.")),
-      soldOut ? el("p", { class: "notice" }, "Remove sold-out items to check out.") : "",
-      paymentNode(current),
-      el("button", { type: "button", disabled: "" }, "Checkout opens soon"));
+      soldOut ? el("p", { class: "notice" }, "Remove sold-out items to check out.") : checkoutNode(current));
   }
 
-  // The cart can be paid through a channel only if every product allows it.
-  function paymentNode(current) {
-    const names = new Map(channels.map((c) => [c.id, c.name]));
-    let allowed = null;
+  // Each product is paid through exactly one channel, so a cart can be
+  // checked out only if all its products share one.
+  function checkoutNode(current) {
+    const byId = new Map(channels.map((c) => [c.id, c]));
+    const ids = new Set(current.map((i) => i.variant.expand.product.channel));
+    const channel = ids.size === 1 ? byId.get([...ids][0]) : null;
+    if (channel) return checkoutForm(channel);
+
+    const groups = new Map();
     for (const i of current) {
-      const ids = new Set(i.variant.expand.product.channels.filter((id) => names.has(id)));
-      allowed = allowed ? new Set([...allowed].filter((id) => ids.has(id))) : ids;
-    }
-    if (allowed && allowed.size) {
-      return el("p", {}, "Payment: ", el("strong", {}, [...allowed].map((id) => names.get(id)).join(" or ")));
+      const name = byId.get(i.variant.expand.product.channel)?.name ?? "Unavailable";
+      groups.set(name, [...(groups.get(name) ?? []), i.variant.expand.product.title]);
     }
     return el("p", { class: "notice" },
-      "These items can't be paid for together. Please order them separately: ",
-      ...current.flatMap((i, n) => [n ? "; " : "",
-        `${i.variant.expand.product.title} (${i.variant.expand.product.channels.map((id) => names.get(id)).filter(Boolean).join(" or ") || "unavailable"})`]),
-      ".");
+      "These items are paid for differently, so please order them separately: ",
+      [...groups].map(([name, titles]) => `${titles.join(", ")} (${name})`).join("; "), ".");
+  }
+
+  function checkoutForm(channel) {
+    const remembered = (() => { try { return JSON.parse(localStorage.getItem("checkout") ?? "{}"); } catch { return {}; } })();
+    const email = el("input", { type: "email", name: "email", required: "", autocomplete: "email", value: remembered.email ?? "" });
+    const name = el("input", { type: "text", name: "name", required: "", autocomplete: "name", maxlength: "200", value: remembered.name ?? "" });
+    const isCard = channel.provider === "stripe";
+    const status = el("p", { role: "status" });
+    const button = el("button", { type: "submit" }, isCard ? "Continue to payment" : "Place order");
+
+    const form = el("form", { class: "checkout" },
+      el("h2", {}, "Check out"),
+      el("label", {}, "Email", email),
+      el("label", {}, "Name", name),
+      el("p", {}, "Payment: ", el("strong", {}, channel.name),
+        isCard ? " (secure checkout by Stripe)" : ". Harry will send payment details; nothing is charged now."),
+      button, status);
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try { localStorage.setItem("checkout", JSON.stringify({ email: email.value, name: name.value })); } catch {}
+      button.setAttribute("aria-busy", "true");
+      button.disabled = true;
+      status.textContent = "";
+      try {
+        const res = await fetch("/shop/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lines: shop.cart.lines(), email: email.value, name: name.value }),
+        });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.message || "Something went wrong. Please try again.");
+        if (body.url) {
+          location.assign(body.url); // Stripe's hosted checkout
+          return;
+        }
+        shop.cart.save([]);
+        root.replaceChildren(
+          el("h2", {}, "Order placed"),
+          el("p", {}, `Thanks, ${name.value}. Your order number is `, el("strong", {}, `#${body.number}`), "."),
+          el("p", {}, "Harry will be in touch with payment details. Nothing has been charged."),
+          el("p", {}, el("a", { href: "/products/" }, "Back to the shop")));
+      } catch (err) {
+        status.textContent = err.message;
+        status.className = "notice";
+        button.removeAttribute("aria-busy");
+        button.disabled = false;
+      }
+    });
+    return form;
   }
 })();

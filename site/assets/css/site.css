@@ -122,3 +122,9 @@
   padding: .75rem 1rem; border-radius: var(--pico-border-radius);
   border-left: 4px solid var(--stock-low); background: var(--pico-card-background-color);
 }
+
+/* checkout and order pages */
+.checkout { margin-top: 2rem; max-width: 32rem; }
+.checkout fieldset label { margin-bottom: .5rem; }
+.order-lines { max-width: 32rem; }
+.order-lines .num { text-align: right; }

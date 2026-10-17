@@ -1,27 +1,4 @@
 {{ define "main" }}
 <h1>{{ .Title }}</h1>
-<article>
-  <p>Counter: <strong id="count">…</strong></p>
-  <button id="plus" type="button">+1</button>
-</article>
-<script>
-  const clicks = "/api/collections/clicks/records";
-  const count = document.getElementById("count");
-
-  async function refresh() {
-    const res = await fetch(clicks + "?perPage=1&fields=id");
-    count.textContent = (await res.json()).totalItems;
-  }
-
-  document.getElementById("plus").addEventListener("click", async () => {
-    await fetch(clicks, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-    });
-    refresh();
-  });
-
-  refresh();
-</script>
+<p>Coming soon.</p>
 {{ end }}

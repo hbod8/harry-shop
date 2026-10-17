@@ -12,8 +12,10 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/hook"
 	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/spf13/cobra"
 
 	_ "github.com/hbod8/harry-shop/migrations"
+	"github.com/hbod8/harry-shop/shop"
 )
 
 func main() {
@@ -22,6 +24,21 @@ func main() {
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 		TemplateLang: migratecmd.TemplateLangGo,
 		Automigrate:  osutils.IsProbablyGoRun(),
+	})
+
+	app.RootCmd.AddCommand(&cobra.Command{
+		Use:   "seed",
+		Short: "Add sample products, customers and orders (local development only)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := app.RunAllMigrations(); err != nil {
+				return err
+			}
+			if err := shop.Seed(app); err != nil {
+				return err
+			}
+			log.Println("sample data added")
+			return nil
+		},
 	})
 
 	// static Hugo output; registered last so PocketBase's own routes win

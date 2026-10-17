@@ -7,109 +7,124 @@ before starting the next. Background and the full schema are in `background.md`.
 ## Repository layout (target)
 
 ```
-main.go                 PocketBase app, static serving, hook and route wiring, cron
-migrations/             Go migrations (collections, API rules, seed) + API rule tests
-shop/                   Go package: Stripe checkout and webhook, community order, reprice, hooks
+main.go                 PocketBase app, static serving, route wiring, cron, seed command
+migrations/             Go migrations (collections, API rules, base config) + API rule tests
+shop/                   Go package: checkout, Stripe webhook, expiry cron, consent hook, dev seed data
   *_test.go             tests using github.com/pocketbase/pocketbase/tests
 site/                   Hugo project (config, layouts, content adapter, static/)
   static/js/api.js      tiny fetch wrapper: base URL, auth token, JSON errors
   static/vendor/        pico.min.css (v2.1.1), committed
 pb_public/              Hugo build output (gitignored)
 pb_data/                SQLite + uploads (gitignored)
-Makefile                dev, site, test, build targets
+Makefile                dev, seed, site, test, build targets
 .env.example            STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SITE_URL
 ```
 
 ## Step 1: Skeleton (done)
 - Module, `main.go` with migratecmd (Go templates) and `pb_public` static serving, Makefile,
   `.gitignore`.
-- Proof of concept: `clicks` collection (public list and create, no update/delete). The home page
-  reads `totalItems` and POSTs a click with plain `fetch`. No custom Go routes.
-- **Try it:** `make site && make dev`, open http://127.0.0.1:8090/ and click +1.
+- Proof of concept (a `clicks` counter over the collection API, since removed) confirmed the
+  API-first approach.
 
-## Step 2: Catalog schema and seed
-- Migration removing the `clicks` proof of concept (and the counter from the home page).
-- Migrations for `channels`, `products` (with `slug`), `variants`, `prices` and the extra `users`
-  fields, with the API rules from `background.md`.
-- A seed migration (or `make seed`) that adds channels `shop` (stripe, public) and `community`
-  (manual, requires_account), plus 2 prints and 1 t-shirt with S/M/L variants and shop prices.
-- **Tests:** anonymous `GET /api/collections/prices/records` returns shop prices but not community
-  ones; a signed-in user sees both; inactive products are hidden; anonymous writes to every
-  catalog collection are refused.
+## Step 2: All collections and rules (Harry reviews in `/_/` before any Hugo work)
+- Migrations for every collection in `background.md`: `storefronts`, `channels`, `terms`,
+  `products`, `variants`, the extra `users` fields (and OTP), `user_notes`, `orders`,
+  `order_lines` (the ledger), `stripe_events`, the `order_totals` view, and admin views
+  `customers`, `orders_unconfirmed`, `orders_confirmed`, `stats`, with fields, indexes and API
+  rules.
+- Base config migration: storefront `harry`, channels `card` (stripe) and `manual`.
+- `make seed` (dev only, not a migration): sample terms, 2 prints, 1 t-shirt (S/M/L), 1 unlisted
+  chemistry item (manual only), a group-buy order with a Zelle payment line, a guest card order.
+- **Tests:** anonymous lists hide unlisted and inactive products and their variants, while view
+  by id still works for unlisted; anonymous writes to catalog collections are refused; a user
+  sees only their own orders, lines and totals; `?session_id=` shows only the matching order and
+  a blank one matches nothing; `user_notes` and `stripe_events` are locked; unique indexes (sku,
+  term per taxonomy, external_ref when set, stripe_session_id when set); `order_totals` for
+  unpaid, partial, paid, overpaid, partly and fully refunded orders.
+- **Try it:** `make dev`, `make seed`, browse every collection in http://127.0.0.1:8090/_/ and try
+  the API rules with curl.
 
-## Step 3: Public site with Hugo
+## Step 3: Consent hook
+- `users`: set `consent_at` when `marketing_consent` turns on, clear it when it turns off. This is
+  the only hook; everything else admin-side is Harry in `/_/` or a view.
+- **Tests:** sign-up with and without consent, turning it off later.
+
+## Step 4: Public site with Hugo
 - `site/` content adapter `site/content/products/_content.gotmpl`: `resources.GetRemote` on
-  `{{ site.Params.api }}/api/collections/products/records?filter=active=true&expand=...`
-  (and variants/prices for the `shop` channel), `transform.Unmarshal`, then `.AddPage` per product
-  with title, slug, description, images, variants and prices as page params.
-  If expand can't reach variants/prices from products, fetch those collections separately and
-  join in the template.
-- Layouts: base (Pico CSS, `api.js`), home, product list grid, product page with variant
-  picker and an add-to-cart button, about, shipping/returns policy stub.
-- Product images: use PocketBase file URLs (`/api/files/products/{id}/{filename}?thumb=...`).
-  Configure `thumbs` on the images field.
+  `{{ site.Params.api }}/api/collections/products/records?filter=storefront.slug="harry"&expand=terms,variants_via_product`
+  (listed products only, by the rules), `transform.Unmarshal`, then `.AddPage` per product with
+  title, slug, description, images, variants, and terms grouped by taxonomy as page params
+  (`tags`, `themes`, `collections`, `types`).
+- `go run . hugo-taxonomies` writes `site/config/_default/taxonomies.toml` from the distinct
+  `terms.taxonomy` values plus `type = "types"`; `make site` runs it before `hugo`. Storefront slug
+  is a site param, so another storefront is another build.
+- Layouts: base (Pico CSS, `api.js`), home, product grid, product page with variant picker and an
+  add-to-cart button, taxonomy and term pages, generic `/item/` page for unlisted products, about,
+  shipping/returns policy stub.
+- Product images: PocketBase file URLs (`/api/files/products/{id}/{filename}?thumb=...`).
 - `make site` = `hugo --source site` (PocketBase must be running for the content adapter).
 - Design: plain, image-led grid; big photos; one accent color via Pico CSS variables; works on phones.
-- **Try it:** `make site`, reload http://127.0.0.1:8090/, browse products.
+- **Try it:** `make site`, browse products, tags and an unlisted item link.
 
-## Step 4: Live stock and cart (JS + collection API only)
-- Product pages fetch `/api/collections/variants/records/{id}` and show "In stock", "2 left" or
-  "Sold out" from `on_hand - reserved`.
+## Step 5: Live stock and cart (JS + collection API only)
+- Product pages fetch the variant and show "In stock", "2 left" or "Sold out" from
+  `on_hand - reserved` (computed in the page).
 - Cart lives in `localStorage` as `[{variant, qty}]` (max ~20 lines). Header badge reads it.
-- `site/content/cart.md`: JS fetches the cart's variants and shop prices from the API, renders
-  lines and a subtotal, lets the buyer change quantities, and drops lines whose variant is gone or
-  inactive. Displayed prices are for show only; checkout reprices on the server.
-- No Go code in this step.
-- **Try it:** add items, reload, change quantities, mark a product inactive in `/_/` and see it drop.
+- `site/content/cart.md`: JS fetches the cart's variants from the API, renders lines and a
+  subtotal, lets the buyer change quantities, drops lines that are gone or inactive, and shows
+  which channels (card, manual) the whole cart allows. Displayed prices are for show only.
+- **Try it:** add items, reload, change quantities, deactivate a product in `/_/` and see it drop.
 
-## Step 5: Checkout and webhook in a Stripe sandbox
-- Migrations for `orders`, `order_lines`, `payments`, `stripe_events` with the rules in `background.md`.
-- `POST /shop/checkout` (JSON `{lines:[{variant, qty}]}`): validate, reprice from the DB, reserve
-  stock and create the `pending` order and lines in one transaction, create the Stripe session,
-  return `{url}`. The cart page redirects to it. Out of stock returns 409 with the variant IDs;
-  the cart page shows which lines and nothing is reserved.
+## Step 6: Checkout and webhook in a Stripe sandbox
+- `POST /shop/checkout` (JSON `{lines:[{variant, qty}], channel, email, name}`): validate lines,
+  check every product allows the channel (else 400 "order these separately"), reprice from the DB,
+  find or create the user by email, then in one transaction create the `unconfirmed` order and
+  its `item` lines with `quoted_cents = unit_cents = price_cents` (plus a `shipping` line for
+  shipped card orders).
+  - `card`: reserve stock, create the Stripe session, return `{url}`. Out of stock = 409 with the
+    variant ids, nothing reserved.
+  - `manual`: no reservation, return the order page URL.
 - `POST /shop/stripe/webhook` and the 15-minute release cron, as described in `background.md`.
-- Success page is a Hugo page `/order/?session_id=...` that reads the order through the API
-  (view rule matches `stripe_session_id = @request.query.session_id`). Read only.
-- Use `stripe.NewClient(key)` and `sc.V1CheckoutSessions.Create`. Hide it behind a small
-  interface so checkout can be tested without the network.
+- Success page `/order/?session_id=...` reads the order through the API. Read only.
+- Use `stripe.NewClient(key)` and `sc.V1CheckoutSessions.Create`, behind a small interface so
+  checkout can be tested without the network. Flat-rate `shipping_options`.
 - **Tests:**
-  - Checkout: unknown, inactive or over-stock lines are rejected; prices come from the DB.
+  - Checkout: unknown, inactive or over-stock lines rejected; prices from the DB; channel mismatch
+    rejected; existing email reuses the user.
   - Reservation: two concurrent checkouts for the last unit, only one succeeds.
-  - Webhook: build signed payloads with `webhook.GenerateTestSignedPayload` from stripe-go; check
-    bad signature = 400, completed marks paid and moves stock, a duplicate event is a no-op,
-    expired releases stock, refunded adds a negative payment.
-  - Order view rule: right session id sees the order, wrong or missing one gets 404.
+  - Webhook: signed payloads via `webhook.GenerateTestSignedPayload`; bad signature = 400,
+    completed confirms the order, moves stock and adds tax and payment lines, a duplicate event
+    is a no-op, expired releases stock and cancels, refunded adds a refund line.
 - **Try it:** `.env` with sandbox keys, `stripe listen --forward-to localhost:8090/shop/stripe/webhook`,
-  buy with 4242 4242 4242 4242, watch the order go `pending` to `paid` and `on_hand` drop in `/_/`.
+  buy with 4242 4242 4242 4242, watch the order go `unconfirmed` to `confirmed` and its
+  `order_totals` row to `paid`.
 
-## Step 6: Expiry and refunds by hand
-- **Try it:** start a checkout and abandon it (or `stripe trigger checkout.session.expired`);
-  confirm `reserved` returns to 0 and the order is `cancelled`. Refund an order in the Stripe
-  dashboard; confirm the negative `payments` row.
+## Step 7: Expiry and refunds by hand
+- **Try it:** abandon a checkout (or `stripe trigger checkout.session.expired`); confirm `reserved`
+  returns to 0 and the order is `cancelled`. Refund in the Stripe dashboard; confirm the `refund`
+  line and `order_totals.payment_status = refunded`.
 
-## Step 7: Accounts and Community
-- Hugo pages `/login/`, `/signup/`, `/account/` using PocketBase's auth API
-  (`auth-with-password`, `users` create, `request-password-reset`). `api.js` keeps the token in
-  `localStorage` and sends it as `Authorization`. A record hook sets `consent_at` when
-  `marketing_consent` is set.
-- `/community/` Hugo page: JS lists community products and prices (the price rule already hides
-  them from anonymous users).
-- `POST /shop/community/order` (`apis.RequireAuth()`): creates an `awaiting_payment` order with
-  lines at the current estimated price. No stock reserved.
-- `/account/orders/` and `/account/order/?id=...`: the member's orders, lines and payments through
-  the API; the page shows balance = total minus payments.
-- Harry records Zelle/Venmo payments in `/_/` (`payments` with `external_ref`).
-- `POST /shop/admin/reprice` behind `apis.RequireSuperuserAuth()`: set the real `unit_cents` on all
-  open lines for a variant, recompute totals. Document the curl; a form page is optional.
-- Hook: when a payment brings the balance to zero, set the order `paid`.
-- **Tests:** one member can't see another's orders, lines or payments; community order uses DB
-  prices and needs auth; reprice updates totals and balances; duplicate `external_ref` is rejected.
+## Step 8: Accounts and group buys
+- Hugo pages `/login/` (email OTP, or password), `/account/` and `/account/order/?id=...` using
+  PocketBase's auth API. `api.js` keeps the token in `localStorage`. The order page shows the
+  lines (quoted vs final price, payments) and the `order_totals` row.
+- No admin code: Harry records Zelle/Venmo/cash as `payment` lines and reprices by editing
+  `unit_cents` on `unconfirmed` item lines, both in `/_/`.
+- **Tests:** OTP sign-in sees the orders placed with that email.
 
-## Step 8: Deploy (do with Harry, not alone)
+## Step 9: Deploy (do with Harry, not alone)
 - `make build` for linux/amd64, systemd unit file in `deploy/`, env file template, backup and
-  Litestream config in `deploy/`, a written restore test procedure. Turn on PocketBase's rate
-  limiter for public create endpoints. No production changes without Harry asking.
+  Litestream config in `deploy/`, a written restore test procedure. SMTP settings for OTP mail. `TZ=America/Los_Angeles` in the unit so the
+  `stats` view's calendar periods start at local midnight.
+  Turn on PocketBase's rate limiter for public create endpoints. No production changes without
+  Harry asking.
+
+## Later (space left in the schema, not built)
+- Views for outstanding orders, revenue and stats (Harry, via migrations).
+- More storefronts: another Hugo build with a different storefront param; serve by `domain`.
+- In-person booth: new channel providers (square, cash) by migration; shared stock already works.
+- Per-channel prices: `price_overrides` table.
+- Shipping labels: Shippo or Parcelcraft; `tracking_number` already exists.
 
 ## Before go-live (Harry's checklist, not code)
 - Washington DOR registration; add WA registration in Stripe Tax; live keys and live webhook

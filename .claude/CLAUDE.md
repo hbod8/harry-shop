@@ -1,8 +1,8 @@
 # harry-shop
 
-Harry's personal shop: his own photo prints and t-shirts, plus a sign-in "Community"
-group buy for film chemistry (paid by Zelle/Venmo, local pickup). Single seller,
-low volume (under $1,000/month at first).
+Harry's personal shop: his own photo prints and t-shirts, plus group buys of film chemistry
+(ordered with just an email, paid by Zelle/Venmo, local pickup), with room for more storefronts.
+Single seller, low volume (under $1,000/month at first).
 
 Read before working:
 - `.claude/plan.md`: what to build, in order, with how to test each step.
@@ -24,14 +24,16 @@ Read before working:
 
 ## API first
 - Every read and write goes through PocketBase's built-in collection API (`/api/collections/...`),
-  guarded by API rules in migrations, with record hooks for side effects.
-- Custom routes only where the collection API can't do the job: talking to Stripe (checkout,
-  webhook) or server-side money math (community order, reprice). They live under `/shop/` in the
+  guarded by API rules in migrations. Admin work (order status, payments, repricing, stock fixes)
+  is done by Harry in `/_/`, not code. Totals and stats are view collections.
+- Custom routes only where the collection API can't do the job: checkout (server-side pricing,
+  stock, Stripe) and the Stripe webhook, plus a cron for expired reservations. They live under `/shop/` in the
   `shop` package, are registered inside PocketBase, and return JSON.
 
 ## Rules
 - The browser sends only variant IDs and quantities. The server always looks up prices and stock.
-- Only the verified Stripe webhook marks an order paid. The success page only reads status.
+- Only the verified Stripe webhook records Stripe payments. The success page only reads status.
+- Order totals and balances are never stored; they are sums of `order_lines` (the ledger).
 - Money is integer cents everywhere. Never floats.
 - Schema and API rule changes are Go migrations in `migrations/` (committed). Never edit the schema only in the admin UI.
 - Secrets (Stripe keys, webhook secret) come from env vars / an untracked `.env`. Never commit them.

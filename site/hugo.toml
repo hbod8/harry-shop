@@ -1,0 +1,4 @@
+baseURL = "/"
+title = "harry-shop"
+publishDir = "../pb_public"
+disableKinds = ["taxonomy", "term", "RSS", "sitemap"]

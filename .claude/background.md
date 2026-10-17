@@ -20,41 +20,46 @@ everything needed to build is copied here.
 
 ## Architecture
 
+API first (decided with Harry 2026-10-16): pages are static Hugo HTML; anything live is small
+hand-written JS calling PocketBase's built-in REST API. Custom Go routes exist only where we must
+talk to Stripe or do money math on the server. htmx and Go-template pages were dropped.
+
 ```
-browser ── static HTML (Hugo, in pb_public/) ──┐
-        ── htmx fragments / Go pages ──────────┤  one Go binary (PocketBase v0.40.5)
-        ── POST /shop/checkout ── 303 ─> Stripe hosted Checkout
-Stripe  ── POST /shop/stripe/webhook ──────────┘  pb_data/data.db (SQLite)
-                                                   └─ Litestream + PB backups -> Backblaze B2
+browser ── static HTML + JS (Hugo, in pb_public/) ─┐
+        ── fetch /api/collections/... (rules) ─────┤  one Go binary (PocketBase v0.40.5)
+        ── POST /shop/checkout ── {url} ─> Stripe hosted Checkout
+Stripe  ── POST /shop/stripe/webhook ──────────────┘  pb_data/data.db (SQLite)
+                                                       └─ Litestream + PB backups -> Backblaze B2
 ```
 
-- **Public pages (Hugo).** Home, product list, product pages, about, policies. Hugo pulls the
-  catalog from PocketBase's REST API at build time using a content adapter
-  (`content/products/_content.gotmpl` with `resources.GetRemote` + `.AddPage`). Rebuild after
-  catalog edits. Output goes to `pb_public/`, served by `apis.Static` on `GET /{path...}`.
-- **Live bits (htmx).** Stock badge, add-to-cart, cart page body: Hugo pages contain
-  `hx-get`/`hx-post` attributes that hit `/shop/...` routes returning HTML fragments from Go templates.
-- **Signed-in pages (Go templates).** Login, "My orders", order detail with balance, Community
-  catalog. Rendered fully by Go, sharing the same CSS and base layout look.
-- **Admin.** PocketBase's built-in admin UI (`/_/`) for catalog, payments and orders, plus one
-  custom reprice route.
+- **Public pages (Hugo).** Home, product list, product pages, about, policies, cart, login,
+  account, community. Hugo pulls the catalog from PocketBase's REST API at build time using a
+  content adapter (`content/products/_content.gotmpl` with `resources.GetRemote` + `.AddPage`).
+  Rebuild after catalog edits. Output goes to `pb_public/`, served by `apis.Static` on `GET /{path...}`.
+- **Live bits (JS + collection API).** Stock badge, cart, account pages, community catalog. One
+  small `site/static/js/api.js` wraps `fetch` (JSON, auth header, error display). No SDK, no build.
+- **Custom routes (`shop` package, JSON).** `POST /shop/checkout`, `POST /shop/stripe/webhook`,
+  `POST /shop/community/order`, `POST /shop/admin/reprice`. Everything else goes through the
+  collection API and record hooks.
+- **Admin.** PocketBase's built-in admin UI (`/_/`) for catalog, payments and orders.
 
-### Auth for server-rendered pages
-PocketBase v0.40.5 reads auth only from the `Authorization` header (`apis/middlewares.go`,
-`loadAuthToken`). For HTML pages we need a cookie:
-- `POST /shop/login` form: `app.FindAuthRecordByEmail("users", email)`, `rec.ValidatePassword(pw)`,
-  `rec.NewAuthToken()`, set cookie `pb_auth` (HttpOnly, Secure in prod, SameSite=Lax, Path=/).
-- A router middleware with priority `apis.DefaultLoadAuthTokenMiddlewarePriority - 1` that copies
-  the cookie into the `Authorization` header when the header is empty. Then `e.Auth` and API rules
-  work normally.
-- `POST /shop/logout` clears the cookie.
-- CSRF: SameSite=Lax plus rejecting POSTs to `/shop/*` (except the webhook) whose `Origin` header
-  doesn't match the site.
+### Auth
+- PocketBase's own auth API: `POST /api/collections/users/auth-with-password`, `users` create for
+  sign-up, password reset by email. The token is kept in `localStorage` by `api.js` and sent as
+  the `Authorization` header, so API rules and `e.Auth` work with no cookie bridge.
+- No auth cookies means no CSRF surface on our routes. The cost is that an XSS bug could read the
+  token, so never insert API data into the page with `innerHTML`; use `textContent` or build elements.
+- Sign-up records `marketing_consent`; a record hook sets `consent_at` server-side.
 
 ### Cart
-Unsigned cookie `cart` holding `[{variant_id, qty}]`, max ~20 lines. It doesn't need signing
-because the server re-validates IDs and reprices everything at checkout; a tampered cookie can
-only produce a different, correctly priced cart.
+`localStorage` key `cart` holding `[{variant, qty}]`, max ~20 lines. It needs no protection
+because `/shop/checkout` re-validates IDs and reprices everything; a tampered cart can only
+produce a different, correctly priced order.
+
+### Order pages without an account
+Shop buyers don't sign in. Stripe's `success_url` carries `{CHECKOUT_SESSION_ID}`; the `orders`
+and `order_lines` view rules also allow `stripe_session_id = @request.query.session_id`, so the
+`/order/` page can read that one order through the API. The session id is unguessable.
 
 ## Data model (Go migrations)
 Money is a Number field with "no decimals", in cents. Empty API rule = public; null (locked) =
@@ -66,15 +71,16 @@ superusers and Go code only.
 | `products` | `title`, `slug`, `description`, `images` (file, multiple), `tax_code`, `active` | `active = true` | admin UI |
 | `variants` | `product` (relation), `sku` (unique), `name`, `on_hand`, `reserved` | public | admin UI and Go |
 | `prices` | `channel`, `variant`, `amount_cents`, `active`; unique (channel, variant) | `active = true && (channel.requires_account = false \|\| @request.auth.id != "")` | admin UI |
-| `users` (built in) | `name`, `phone`, `marketing_consent`, `consent_at` | own record | sign-up |
-| `orders` | `channel`, `user` (optional), `email`, `name`, `phone`, `ship_line1`, `ship_line2`, `ship_city`, `ship_state`, `ship_postal`, `ship_country`, `status`, `subtotal_cents`, `tax_cents`, `shipping_cents`, `total_cents`, `stripe_session_id`, `stripe_payment_intent`, `stripe_customer`, `expires_at` | `user = @request.auth.id` | Go only |
-| `order_lines` | `order` (cascade delete), `variant`, `sku`, `name`, `quantity`, `unit_cents` | `order.user = @request.auth.id` | Go and admin UI |
+| `users` (built in) | `name`, `phone`, `marketing_consent`, `consent_at` | own record | sign-up via API; hook sets `consent_at` |
+| `orders` | `channel`, `user` (optional), `email`, `name`, `phone`, `ship_line1`, `ship_line2`, `ship_city`, `ship_state`, `ship_postal`, `ship_country`, `status`, `subtotal_cents`, `tax_cents`, `shipping_cents`, `total_cents`, `stripe_session_id`, `stripe_payment_intent`, `stripe_customer`, `expires_at` | list: `user = @request.auth.id`; view: that or `stripe_session_id = @request.query.session_id` | Go only |
+| `order_lines` | `order` (cascade delete), `variant`, `sku`, `name`, `quantity`, `unit_cents` | `order.user = @request.auth.id` or `order.stripe_session_id = @request.query.session_id` | Go and admin UI |
 | `payments` | `order`, `method` (stripe, zelle, venmo, cash), `amount_cents` (negative = refund), `external_ref` (unique), `note` | `order.user = @request.auth.id` | Go and admin UI |
 | `stripe_events` | `event_id` (unique), `type` | locked | Go only |
 
 - Order `status`: `pending` (Stripe session open), `awaiting_payment` (Community), `paid`,
   `fulfilled`, `cancelled`.
-- Balance = `total_cents - sum(payments.amount_cents)`, computed in Go, never stored.
+- Balance = `total_cents - sum(payments.amount_cents)`, never stored. Go computes it for the
+  paid-status hook; account pages compute it for display from the same API data.
 - Plain address columns, SKUs, consent and Stripe IDs are deliberate: they map onto
   Shopify/WooCommerce CSV imports if Harry ever moves.
 - `slug` on `products` is an addition to the original doc, needed for Hugo URLs.
@@ -116,4 +122,4 @@ superusers and Go code only.
 ## Versions checked on 2026-10-17
 PocketBase v0.40.5 (go 1.27 in its go.mod), stripe-go v87.0.0, htmx v4.0.0 (released 2026-08-28;
 changed some defaults from 2.x, so read its migration notes rather than 2.x tutorials),
-Hugo v0.168.0, Pico CSS v2.1.1.
+Hugo v0.168.0, Pico CSS v2.1.1. (htmx was dropped on 2026-10-16 for the API-first design.)
